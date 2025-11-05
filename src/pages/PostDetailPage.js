@@ -52,11 +52,21 @@ const PostDetailPage = () => {
     return <NotFoundPage message={`Post with ID "${id}" not found.`} />;
   }
 
-  // Render content blocks
   const renderContentBlock = (block, index) => {
     switch (block.type) {
       case 'text':
-        return <p key={index} className="mb-4">{block.value}</p>;
+        // Check for iframe
+        if (block.value.includes('<iframe')) {
+          return <div key={index} dangerouslySetInnerHTML={{ __html: block.value }} />;
+        }
+        // Check for URL
+        try {
+          const url = new URL(block.value);
+          return <a key={index} href={url.href} className="text-blue-500 hover:underline">{url.href}</a>;
+        } catch (_) {
+          // Not a URL, render as paragraph
+          return <p key={index} className="mb-4">{block.value}</p>;
+        }
       case 'heading':
         return <h2 key={index} className="text-2xl font-bold my-6">{block.value}</h2>;
       case 'image':

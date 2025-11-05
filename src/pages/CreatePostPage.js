@@ -18,6 +18,7 @@ const CreatePostPage = () => {
   const { showNotification } = useNotification();
   const [isUpdate, setIsUpdate] = useState(false);
   const [postId, setPostId] = useState(null);
+  const [isDropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -226,15 +227,20 @@ const CreatePostPage = () => {
             ))}
           </div>
           <div className="mt-6 flex items-center space-x-4">
-            <Button type="button" variant="secondary" onClick={() => addBlock('text')}>
-              <IconPlusCircle className="h-4 w-4 mr-2" /> Add Text
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => addBlock('heading')}>
-              <IconPlusCircle className="h-4 w-4 mr-2" /> Add Heading
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => addBlock('image')}>
-              <IconPlusCircle className="h-4 w-4 mr-2" /> Add Image
-            </Button>
+            <div className="relative">
+              <Button type="button" variant="secondary" onClick={() => setDropdownOpen(!isDropdownOpen)}>
+                <IconPlusCircle className="h-4 w-4 mr-2" /> Add Content
+              </Button>
+              {isDropdownOpen && (
+                <div className="absolute z-10 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg">
+                  <button onClick={() => { addBlock('text'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Add Text</button>
+                  <button onClick={() => { addBlock('heading'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Add Heading</button>
+                  <button onClick={() => { addBlock('image'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Add Image</button>
+                  <button onClick={() => { addBlock('text'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Add Link</button>
+                  <button onClick={() => { addBlock('text'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Add iFrame</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
