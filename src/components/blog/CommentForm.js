@@ -1,71 +1,114 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import Button from '../ui/Button';
+import React, { useState, useEffect, useRef } from "react";
+import { useAuth } from "../../context/AuthContext";
+import Button from "../ui/Button";
 
 const CommentForm = ({ postId, onCommentPosted, parentCommentId, onCancelReply }) => {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { axiosInstance, user } = useAuth();
+  const textareaRef = useRef(null);
 
   useEffect(() => {
-    if (parentCommentId) {
-      // Optionally focus the textarea when replying
-      // document.getElementById('comment').focus();
+    if (parentCommentId && textareaRef.current) {
+      textareaRef.current.focus();
     }
   }, [parentCommentId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
+    if (!user) {
+      setError("You must be logged in to post a comment.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
+
     try {
-      const url = parentCommentId 
-        ? `/comments/${parentCommentId}/reply` 
+      const url = parentCommentId
+        ? `/comments/${parentCommentId}/reply`
         : `/comments/post/${postId}`;
+
       const res = await axiosInstance.post(url, { content });
-      
-      const newCommentWithUser = {
+      const newComment = {
         ...res.data.comment,
-        author: { name: user.name },
-        // Ensure replies array exists for parent comments if it's a new reply
-        ...(parentCommentId && { parentComment: parentCommentId })
+        user: { _id: user._id, name: user.name, avatar: user.avatar },
+        ...(parentCommentId && { parentComment: parentCommentId }),
       };
-      onCommentPosted(newCommentWithUser); 
-      setContent(''); 
-      if (onCancelReply) onCancelReply(); // Clear reply state in parent
+
+      onCommentPosted(newComment);
+      setContent("");
+      if (onCancelReply) onCancelReply();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'An error occurred');
+      setError(err.response?.data?.message || "Failed to post comment.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg shadow-inner">
-      <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {parentCommentId ? 'Reply to comment' : 'Leave a comment'}
-      </label>
-      <textarea
-        id="comment"
-        name="comment"
-        rows="3"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-        placeholder={parentCommentId ? 'Your reply...' : 'What are your thoughts?'}
-      ></textarea>
-      {error && <p className="text-red-500 text-sm mt-1 dark:text-red-400">{error}</p>}
-      <div className="mt-2 flex justify-end space-x-2">
-        {parentCommentId && (
-          <Button type="button" variant="secondary" onClick={onCancelReply}>
-            Cancel Reply
-          </Button>
+    <form
+      onSubmit={handleSubmit}
+      className={`mb-6 transition-all duration-200 ${
+        parentCommentId
+          ? "ml-10 border-l-2 border-slate-300 dark:border-slate-700 pl-4"
+          : ""
+      }`}
+    >
+      <div
+        className={`p-4 rounded-lg border shadow-sm transition-colors duration-200 
+          bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700
+          focus-within:border-slate-400 dark:focus-within:border-slate-500`}
+      >
+        <textarea
+          ref={textareaRef}
+          id="comment"
+          name="comment"
+          rows="3"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.ctrlKey && e.key === "Enter") handleSubmit(e);
+          }}
+          placeholder={
+            parentCommentId
+              ? "Reply to this comment..."
+              : "What are your thoughts?"
+          }
+          className="w-full px-3 py-2 text-sm rounded-md bg-transparent resize-none
+            text-gray-900 dark:text-gray-100
+            placeholder-gray-400 dark:placeholder-gray-500
+            border-none focus:ring-0"
+        />
+
+        {error && (
+          <p className="text-red-500 text-xs mt-1 dark:text-red-400">{error}</p>
         )}
-        <Button type="submit" isLoading={loading} className="w-auto px-6">
-          {parentCommentId ? 'Post Reply' : 'Post Comment'}
-        </Button>
+
+        <div className="mt-3 flex justify-end space-x-2">
+          {parentCommentId && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={onCancelReply}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+          )}
+          <Button
+            type="submit"
+            size="sm"
+            isLoading={loading}
+            disabled={!content.trim()}
+            className="text-xs px-4"
+          >
+            {parentCommentId ? "Reply" : "Comment"}
+          </Button>
+        </div>
       </div>
     </form>
   );

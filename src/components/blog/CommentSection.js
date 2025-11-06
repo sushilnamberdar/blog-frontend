@@ -1,52 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DUMMY_COMMENTS } from '../../utils/dummyData';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
-import Pagination from '../ui/Pagination';
+
+const COMMENTS_PER_PAGE = 10;
 
 const CommentSection = ({ postId }) => {
   const { user, axiosInstance } = useAuth();
   const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [totalComments, setTotalComments] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [replyToCommentId, setReplyToCommentId] = useState(null);
-  const [commentCurrentPage, setCommentCurrentPage] = useState(1);
-  const [commentTotalPages, setCommentTotalPages] = useState(1);
-  const COMMENTS_PER_PAGE = 5; // Define comments per page
 
-  const fetchComments = async (page = 1) => {
+  const observer = useRef();
+
+  const lastCommentRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage((prev) => prev + 1);
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [loading, hasMore]
+  );
+
+  const fetchComments = async (pageNumber = 1) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await axiosInstance.get(`/comments/post/${postId}?page=${page}&limit=${COMMENTS_PER_PAGE}`);
-      const fetchedComments = res.data || [];
+      const res = await axiosInstance.get(
+        `/comments/post/${postId}?page=${pageNumber}&limit=${COMMENTS_PER_PAGE}`
+      );
 
-      setComments(fetchedComments);
-      // Assuming pagination info is not directly in res.data if it's an array of comments
-      setCommentCurrentPage(1);
-      setCommentTotalPages(1);
+      const fetched = res.data.comments || [];
+      const total = res.data.pagination?.totalAllComments || 0;
+      const totalPages = res.data.pagination?.totalPages || 1;
+
+      setComments((prev) =>
+        pageNumber === 1 ? fetched : [...prev, ...fetched]
+      );
+      setTotalComments(total);
+      setHasMore(pageNumber < totalPages);
     } catch (err) {
-      setError('Error loading comments. Loading dummy comments.');
-      console.warn('Error fetching comments, loading dummy data:', err);
-      setComments(DUMMY_COMMENTS[postId] || []);
-      setCommentCurrentPage(1);
-      setCommentTotalPages(1);
+      console.error('Error fetching comments:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchComments(commentCurrentPage);
-  }, [postId, axiosInstance, commentCurrentPage]);
+    fetchComments(page);
+  }, [page, postId]);
 
   const onCommentPosted = (newComment) => {
-    // After posting a new comment or reply, refetch comments to ensure pagination is correct
-    fetchComments(commentCurrentPage);
-    setReplyToCommentId(null); // Clear reply form
-  };
-
-  const handlePageChange = (page) => {
-    setCommentCurrentPage(page);
+    setComments((prev) => [newComment, ...prev]);
+    setTotalComments((prev) => prev + 1);
+    setReplyToCommentId(null);
   };
 
   const handleLikeToggle = async (commentId) => {
@@ -56,53 +70,51 @@ const CommentSection = ({ postId }) => {
     }
     try {
       await axiosInstance.put(`/comments/${commentId}/like`);
-      setComments(prevComments => {
-        const updateLikes = (commentsArr) => {
-          return commentsArr.map(comment => {
-            if (comment._id === commentId) {
-              const hasLiked = comment.likes.includes(user._id);
-              return {
-                ...comment,
-                likes: hasLiked
-                  ? comment.likes.filter(id => id !== user._id)
-                  : [...comment.likes, user._id],
-              };
-            } else if (comment.replies && comment.replies.length > 0) {
-              return {
-                ...comment,
-                replies: updateLikes(comment.replies),
-              };
-            }
-            return comment;
-          });
-        };
-        return updateLikes(prevComments);
-      });
+      const updateLikes = (arr) =>
+        arr.map((c) => {
+          if (c._id === commentId) {
+            const liked = c.likes.includes(user._id);
+            return {
+              ...c,
+              likes: liked
+                ? c.likes.filter((id) => id !== user._id)
+                : [...c.likes, user._id],
+            };
+          } else if (c.replies?.length) {
+            return { ...c, replies: updateLikes(c.replies) };
+          }
+          return c;
+        });
+      setComments((prev) => updateLikes(prev));
     } catch (err) {
       console.error('Error toggling like:', err);
     }
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) {
-      return;
-    }
+    if (!window.confirm('Delete this comment?')) return;
     try {
       await axiosInstance.delete(`/comments/${commentId}`);
-      setComments(prevComments => prevComments.filter(comment => comment._id !== commentId));
+      const removeComment = (arr) =>
+        arr
+          .filter((c) => c._id !== commentId)
+          .map((c) => ({
+            ...c,
+            replies: c.replies ? removeComment(c.replies) : [],
+          }));
+      setComments((prev) => removeComment(prev));
+      setTotalComments((prev) => prev - 1);
     } catch (err) {
       console.error('Error deleting comment:', err);
-      alert(err.response?.data?.message || 'Failed to delete comment.');
     }
-  };
-
-  const handleReplyClick = (commentId) => {
-    setReplyToCommentId(commentId);
   };
 
   return (
     <div className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6 dark:text-gray-100">Discussion</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+        Discussion ({totalComments})
+      </h2>
+
       {user ? (
         <CommentForm
           postId={postId}
@@ -112,25 +124,26 @@ const CommentSection = ({ postId }) => {
         />
       ) : (
         <p className="text-gray-600 dark:text-gray-400">
-          You must be logged in to leave a comment.
+          Log in to join the discussion.
         </p>
       )}
 
-      {loading && <p className="dark:text-gray-300">Loading comments...</p>}
-      {error && <p className="text-yellow-700 bg-yellow-100 p-3 rounded-md my-4 text-sm dark:bg-yellow-900 dark:text-yellow-200">{error}</p>}
       <CommentList
         comments={comments}
-        onReplyClick={handleReplyClick}
+        onReplyClick={setReplyToCommentId}
         onLikeToggle={handleLikeToggle}
         onDeleteComment={handleDeleteComment}
         currentUser={user}
+        lastCommentRef={lastCommentRef}
       />
-      {!loading && comments.length > 0 && commentTotalPages > 1 && (
-        <Pagination
-          currentPage={commentCurrentPage}
-          totalPages={commentTotalPages}
-          onPageChange={handlePageChange}
-        />
+
+      {loading && (
+        <p className="text-gray-500 text-center mt-4">Loading comments...</p>
+      )}
+      {!hasMore && !loading && comments.length > 0 && (
+        <p className="text-gray-400 text-center mt-4">
+          You’ve reached the end.
+        </p>
       )}
     </div>
   );
