@@ -37,8 +37,11 @@ const CommentItem = ({ comment, onReplyClick, onLikeToggle, onDeleteComment, cur
             className={`flex items-center ${isLiked ? 'text-red-500' : 'hover:text-red-500'}`}
             disabled={!currentUser}
           >
+            <div className='flex items-center space-x-5'>
             <IconHeart className="mr-1" /> {comment.likes.length > 0 && comment.likes.length}
+            </div>
           </Button>
+          
           {currentUser && (
             <Button variant="ghost" size="sm" onClick={() => onReplyClick(comment._id)} className="flex items-center hover:text-slate-700 dark:hover:text-slate-300">
               <IconReply className="mr-1" /> Reply
