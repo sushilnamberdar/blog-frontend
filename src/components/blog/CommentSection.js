@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
 
-const COMMENTS_PER_PAGE = 10;
+const COMMENTS_PER_PAGE = 5;
 
 const CommentSection = ({ postId }) => {
   const { user, axiosInstance } = useAuth();
