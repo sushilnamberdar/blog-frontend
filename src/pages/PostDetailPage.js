@@ -128,8 +128,8 @@ const PostDetailPage = () => {
       <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4 dark:text-gray-100">{post.title}</h1>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-          <span className="mr-4 flex items-center"><IconUser /> <span className="ml-1.5">{post.author?.name || 'Unknown'}</span></span>
-          <span className="flex items-center"><IconCalendar /> <span className="ml-1.5">{new Date(post.createdAt).toLocaleDateString()}</span></span>
+          <span className="mr-4 flex items-center">{ <img src={post.author?.avatar } alt={post.author?.name} className="w-6 h-6 rounded-full mr-2 inline-block" /> ||<IconUser />  } <span className="ml-1.5">{post.author?.name || 'Unknown'}</span></span>
+          <span className="flex items-center"><IconCalendar /> <span className="ml-1.5">{new Date(post.createdAt).toLocaleDateString()}</span></span> 
         </div>
         <div className="flex items-center space-x-4">
             <button onClick={handleLike} className="flex items-center space-x-1 text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">

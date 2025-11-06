@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { HeartIcon, BookmarkIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as SolidHeartIcon, BookmarkIcon as SolidBookmarkIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../../context/AuthContext';
+import { IconTag } from '../ui/icons';
 
 const PostCard = ({ post }) => {
   const { user, axiosInstance } = useAuth();
@@ -70,7 +71,7 @@ const PostCard = ({ post }) => {
               to={`/?tag=${tag}`}
               className="inline-block bg-gray-100 text-slate-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full hover:bg-gray-200 dark:bg-gray-700 dark:text-slate-200 dark:hover:bg-gray-600"
             >
-              {tag}
+               <IconTag /> {tag}
             </Link>
           ))}
         </div>
