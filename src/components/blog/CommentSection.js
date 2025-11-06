@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import CommentForm from './CommentForm';
-import CommentList from './CommentList';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
+import CommentForm from "./CommentForm";
+import CommentList from "./CommentList";
 
 const COMMENTS_PER_PAGE = 5;
 
@@ -37,17 +37,20 @@ const CommentSection = ({ postId }) => {
         `/comments/post/${postId}?page=${pageNumber}&limit=${COMMENTS_PER_PAGE}`
       );
 
-      const fetched = res.data.comments || [];
+      const fetched = (res.data.comments || []).map(c => ({
+        ...c,
+        likes: c.likes ?? [],
+        replies: c.replies ?? []
+      }));
+
       const total = res.data.pagination?.totalAllComments || 0;
       const totalPages = res.data.pagination?.totalPages || 1;
 
-      setComments((prev) =>
-        pageNumber === 1 ? fetched : [...prev, ...fetched]
-      );
+      setComments((prev) => (pageNumber === 1 ? fetched : [...prev, ...fetched]));
       setTotalComments(total);
       setHasMore(pageNumber < totalPages);
     } catch (err) {
-      console.error('Error fetching comments:', err);
+      console.error("Error fetching comments:", err);
     } finally {
       setLoading(false);
     }
@@ -55,57 +58,82 @@ const CommentSection = ({ postId }) => {
 
   useEffect(() => {
     fetchComments(page);
-  }, [page, postId]);
+  }, [page, postId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onCommentPosted = (newComment) => {
-    setComments((prev) => [newComment, ...prev]);
+  // Helper: immutably insert a reply under its parent
+  const insertReply = (arr, parentId, reply) =>
+    arr.map((c) => {
+      if (c._id === parentId) {
+        return { ...c, replies: [reply, ...(c.replies ?? [])] };
+      }
+      if (c.replies?.length) {
+        return { ...c, replies: insertReply(c.replies, parentId, reply) };
+      }
+      return c;
+    });
+
+  const onTopLevelCommentPosted = (newComment) => {
+    // New top-level comment
+    setComments((prev) => [{ ...newComment, likes: newComment.likes ?? [], replies: newComment.replies ?? [] }, ...prev]);
+    setTotalComments((prev) => prev + 1);
+  };
+
+  const onInlineReplyPosted = (newReply) => {
+    const parentId = newReply.parentComment || replyToCommentId;
+    if (!parentId) {
+      // Fallback: treat as top-level if backend didn’t return parent
+      onTopLevelCommentPosted(newReply);
+    } else {
+      setComments((prev) => insertReply(prev, parentId, { ...newReply, likes: newReply.likes ?? [], replies: [] }));
+    }
     setTotalComments((prev) => prev + 1);
     setReplyToCommentId(null);
   };
 
   const handleLikeToggle = async (commentId) => {
     if (!user) {
-      alert('You must be logged in to like comments.');
+      alert("You must be logged in to like comments.");
       return;
     }
     try {
       await axiosInstance.put(`/comments/${commentId}/like`);
+
       const updateLikes = (arr) =>
         arr.map((c) => {
           if (c._id === commentId) {
-            const liked = c.likes.includes(user._id);
+            const currentLikes = c.likes ?? [];
+            const liked = currentLikes.includes(user._id);
             return {
               ...c,
               likes: liked
-                ? c.likes.filter((id) => id !== user._id)
-                : [...c.likes, user._id],
+                ? currentLikes.filter((id) => id !== user._id)
+                : [...currentLikes, user._id],
             };
           } else if (c.replies?.length) {
             return { ...c, replies: updateLikes(c.replies) };
           }
           return c;
         });
+
       setComments((prev) => updateLikes(prev));
     } catch (err) {
-      console.error('Error toggling like:', err);
+      console.error("Error toggling like:", err);
     }
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Delete this comment?')) return;
+    if (!window.confirm("Delete this comment?")) return;
     try {
       await axiosInstance.delete(`/comments/${commentId}`);
       const removeComment = (arr) =>
         arr
           .filter((c) => c._id !== commentId)
-          .map((c) => ({
-            ...c,
-            replies: c.replies ? removeComment(c.replies) : [],
-          }));
+          .map((c) => ({ ...c, replies: c.replies ? removeComment(c.replies) : [] }));
+
       setComments((prev) => removeComment(prev));
-      setTotalComments((prev) => prev - 1);
+      setTotalComments((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      console.error('Error deleting comment:', err);
+      console.error("Error deleting comment:", err);
     }
   };
 
@@ -116,11 +144,11 @@ const CommentSection = ({ postId }) => {
       </h2>
 
       {user ? (
+        // This one is strictly for NEW top-level comments
         <CommentForm
           postId={postId}
-          onCommentPosted={onCommentPosted}
-          parentCommentId={replyToCommentId}
-          onCancelReply={() => setReplyToCommentId(null)}
+          onCommentPosted={onTopLevelCommentPosted}
+          parentCommentId={null}
         />
       ) : (
         <p className="text-gray-600 dark:text-gray-400">
@@ -135,15 +163,15 @@ const CommentSection = ({ postId }) => {
         onDeleteComment={handleDeleteComment}
         currentUser={user}
         lastCommentRef={lastCommentRef}
+        replyingToId={replyToCommentId}
+        onCancelReply={() => setReplyToCommentId(null)}
+        onInlineReplyPosted={onInlineReplyPosted}
+        postId={postId}
       />
 
-      {loading && (
-        <p className="text-gray-500 text-center mt-4">Loading comments...</p>
-      )}
+      {loading && <p className="text-gray-500 text-center mt-4">Loading comments...</p>}
       {!hasMore && !loading && comments.length > 0 && (
-        <p className="text-gray-400 text-center mt-4">
-          You’ve reached the end.
-        </p>
+        <p className="text-gray-400 text-center mt-4">You’ve reached the end.</p>
       )}
     </div>
   );

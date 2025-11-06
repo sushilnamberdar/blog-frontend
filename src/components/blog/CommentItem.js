@@ -9,31 +9,39 @@ import {
 } from "../ui/icons";
 
 import Button from "../ui/Button";
-import CommentList from "./CommentList";
+// ⚠️ Do NOT import CommentList here to avoid double recursion
+import CommentForm from "./CommentForm";
 
-const CommentItem = ({ comment, onReplyClick, onLikeToggle, onDeleteComment, currentUser, depth = 0 }) => {
-  const [collapsed, setCollapsed] = useState(false);
-  const isLiked = currentUser && comment.likes?.includes(currentUser._id);
+const CommentItem = ({
+  comment,
+  onReplyClick,
+  onLikeToggle,
+  onDeleteComment,
+  currentUser,
+  depth = 0,
+  replyingToId,        // ← NEW: the id currently being replied to
+  onCancelReply,       // ← NEW: to clear replying state
+  onInlineReplyPosted, // ← NEW: when a reply posts, we update tree
+  postId,              // ← for CommentForm when replying
+  collapsedByDefault = false
+}) => {
+  const [collapsed, setCollapsed] = useState(collapsedByDefault);
+  const isLiked = currentUser && (comment.likes ?? []).includes(currentUser._id);
   const isOwner = currentUser && comment.user?._id === currentUser._id;
-
-
-  const [replyingTo, setReplyingTo] = useState(null);
 
   return (
     <div
       className={`group relative flex items-start space-x-3 py-4 rounded-lg transition-all duration-150
-    ${depth > 0 ? "pl-8 before:absolute before:left-3 before:top-0 before:w-[18px] before:h-[calc(100%+12px)] before:border-l-2 before:border-b-2 before:border-gray-300 dark:before:border-gray-700 before:rounded-bl-2xl" : "border-b border-gray-200 dark:border-gray-700"}
-    hover:bg-gray-50 dark:hover:bg-gray-800/40`}
+      ${depth > 0
+        ? "pl-8 before:absolute before:left-3 before:top-0 before:w-[18px] before:h-[calc(100%+12px)] before:border-l-2 before:border-b-2 before:border-gray-300 dark:before:border-gray-700 before:rounded-bl-2xl"
+        : "border-b border-gray-200 dark:border-gray-700"}
+      hover:bg-gray-50 dark:hover:bg-gray-800/40`}
     >
 
       {/* Avatar */}
       <div className="flex-shrink-0 w-9 h-9 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
         {comment.user?.avatar ? (
-          <img
-            src={comment.user.avatar}
-            alt={comment.user.name}
-            className="w-full h-full object-cover"
-          />
+          <img src={comment.user.avatar} alt={comment.user.name} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">
             <IconUser className="w-5 h-5" />
@@ -87,12 +95,11 @@ const CommentItem = ({ comment, onReplyClick, onLikeToggle, onDeleteComment, cur
             variant="ghost"
             size="sm"
             onClick={() => onLikeToggle(comment._id)}
-            className={`flex items-center space-x-1 ${isLiked ? "text-red-500" : "hover:text-red-500"
-              }`}
+            className={`flex items-center space-x-1 ${isLiked ? "text-red-500" : "hover:text-red-500"}`}
             disabled={!currentUser}
           >
             <IconHeart className="w-4 h-4" />
-            {comment.likes?.length > 0 && <span>{comment.likes.length}</span>}
+            {(comment.likes?.length ?? 0) > 0 && <span>{comment.likes.length}</span>}
           </Button>
 
           {currentUser && (
@@ -120,19 +127,20 @@ const CommentItem = ({ comment, onReplyClick, onLikeToggle, onDeleteComment, cur
           )}
         </div>
 
-        {!collapsed && comment.replies?.length > 0 && (
+        {/* Inline reply box shows exactly under the comment being replied to */}
+        {currentUser && replyingToId === comment._id && (
           <div className="mt-3">
-            <CommentList
-              comments={comment.replies}
-              onReplyClick={onReplyClick}
-              onLikeToggle={onLikeToggle}
-              onDeleteComment={onDeleteComment}
-              currentUser={currentUser}
-              replyingTo={replyingTo}
-              depth={depth + 1}
+            <CommentForm
+              postId={postId}
+              parentCommentId={comment._id}
+              onCommentPosted={onInlineReplyPosted}
+              onCancelReply={onCancelReply}
             />
           </div>
         )}
+
+        {/* Children are rendered by CommentList (to avoid double recursion) */}
+        {/* Nothing else here */}
       </div>
     </div>
   );

@@ -32,9 +32,14 @@ const CommentForm = ({ postId, onCommentPosted, parentCommentId, onCancelReply }
         : `/comments/post/${postId}`;
 
       const res = await axiosInstance.post(url, { content });
+
+      // Make sure we provide stable fields so the UI logic never breaks
       const newComment = {
         ...res.data.comment,
         user: { _id: user._id, name: user.name, avatar: user.avatar },
+        likes: res.data.comment?.likes ?? [],
+        replies: res.data.comment?.replies ?? [],
+        createdAt: res.data.comment?.createdAt ?? new Date().toISOString(),
         ...(parentCommentId && { parentComment: parentCommentId }),
       };
 
@@ -52,9 +57,7 @@ const CommentForm = ({ postId, onCommentPosted, parentCommentId, onCancelReply }
     <form
       onSubmit={handleSubmit}
       className={`mb-6 transition-all duration-200 ${
-        parentCommentId
-          ? "ml-10 border-l-2 border-slate-300 dark:border-slate-700 pl-4"
-          : ""
+        parentCommentId ? "ml-10 border-l-2 border-slate-300 dark:border-slate-700 pl-4" : ""
       }`}
     >
       <div
@@ -72,20 +75,14 @@ const CommentForm = ({ postId, onCommentPosted, parentCommentId, onCancelReply }
           onKeyDown={(e) => {
             if (e.ctrlKey && e.key === "Enter") handleSubmit(e);
           }}
-          placeholder={
-            parentCommentId
-              ? "Reply to this comment..."
-              : "What are your thoughts?"
-          }
+          placeholder={parentCommentId ? "Reply to this comment..." : "What are your thoughts?"}
           className="w-full px-3 py-2 text-sm rounded-md bg-transparent resize-none
             text-gray-900 dark:text-gray-100
             placeholder-gray-400 dark:placeholder-gray-500
             border-none focus:ring-0"
         />
 
-        {error && (
-          <p className="text-red-500 text-xs mt-1 dark:text-red-400">{error}</p>
-        )}
+        {error && <p className="text-red-500 text-xs mt-1 dark:text-red-400">{error}</p>}
 
         <div className="mt-3 flex justify-end space-x-2">
           {parentCommentId && (

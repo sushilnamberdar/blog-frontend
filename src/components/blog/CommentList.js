@@ -1,13 +1,16 @@
-import React from 'react';
-import CommentItem from './CommentItem';
+import React from "react";
+import CommentItem from "./CommentItem";
 
 const CommentList = ({
   comments,
   onReplyClick,
   onLikeToggle,
   onDeleteComment,
-  replyingTo,
+  replyingToId,
+  onCancelReply,
+  onInlineReplyPosted,
   currentUser,
+  postId,
   depth = 0,
   lastCommentRef
 }) => {
@@ -27,7 +30,7 @@ const CommentList = ({
         <li
           key={comment._id}
           ref={index === comments.length - 1 && depth === 0 ? lastCommentRef : null}
-          className={`relative pl-${depth > 0 ? 6 : 0}`}
+          className={depth > 0 ? "relative pl-6" : "relative"}  // ← fixed Tailwind class
         >
           {depth > 0 && (
             <span className="absolute left-2 top-0 bottom-0 w-[2px] bg-gray-300 dark:bg-gray-700 rounded-full"></span>
@@ -40,9 +43,14 @@ const CommentList = ({
             onDeleteComment={onDeleteComment}
             currentUser={currentUser}
             depth={depth}
+            replyingToId={replyingToId}
+            onCancelReply={onCancelReply}
+            onInlineReplyPosted={onInlineReplyPosted}
+            postId={postId}
           />
 
-          {comment.replies && comment.replies.length > 0 && (
+          {/* Recursively render replies here (single place) */}
+          {!comment.collapsed && comment.replies && comment.replies.length > 0 && (
             <div className="mt-3 ml-4 border-l border-gray-300 dark:border-gray-700 pl-4">
               <CommentList
                 comments={comment.replies}
@@ -50,6 +58,10 @@ const CommentList = ({
                 onLikeToggle={onLikeToggle}
                 onDeleteComment={onDeleteComment}
                 currentUser={currentUser}
+                replyingToId={replyingToId}
+                onCancelReply={onCancelReply}
+                onInlineReplyPosted={onInlineReplyPosted}
+                postId={postId}
                 depth={depth + 1}
               />
             </div>
